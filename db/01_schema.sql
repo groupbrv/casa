@@ -407,3 +407,8 @@ grant select on public.auditoria, public.v_lancamentos to authenticated;
 revoke execute on function public.gerar_recorrentes(date,int), public.definir_acesso(uuid,text,boolean) from anon, public;
 grant execute on function public.gerar_recorrentes(date,int), public.definir_acesso(uuid,text,boolean),
   public.hoje(), public.meu_papel(), public.pode_ler(), public.pode_editar(), public.e_admin() to authenticated;
+
+-- Backup automático (GitHub Actions usa a chave service_role, que precisa de leitura)
+grant usage on schema public to service_role;
+grant select on all tables in schema public to service_role;
+alter default privileges in schema public grant select on tables to service_role;
