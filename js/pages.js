@@ -225,7 +225,7 @@ function passaStatus(l, s) {
 }
 function linhaTabela(l, cols) {
   const td = {
-    desc: '<td class="desc"><b>' + esc(l.descricao) + (l.revisar ? '<span class="flag" title="Revisar: ' + esc(l.revisar) + '"></span>' : '') + '</b><small>' + esc(C.nome(l.categoria_id) || 'Sem categoria') + '</small></td>',
+    desc: '<td class="desc"><b>' + esc(l.descricao) + (l.revisar ? '<span class="flag" title="Revisar: ' + esc(l.revisar) + '"></span>' : '') + '</b><small>' + tagRec(l) + esc(C.nome(l.categoria_id) || 'Sem categoria') + '</small></td>',
     comp: '<td class="hide-m">' + mesCurto(mesKey(l.competencia)) + '</td>',
     resp: '<td>' + esc(C.nome(l.responsavel_id) || '—') + '</td>',
     cc: '<td>' + esc(C.nome(l.centro_custo_id) || '—') + '</td>',
@@ -242,7 +242,7 @@ function linhaTabela(l, cols) {
 }
 function linhaMovel(l, extra) {
   return '<div class="mrow" data-a="verConta" data-id="' + l.id + '"><b>' + esc(l.descricao) + (l.revisar ? '<span class="flag"></span>' : '') + '</b><span class="v num">' + brl(l.valor) + '</span>' +
-    '<span class="s">' + pill(l) + diasTxt(l) + (extra ? '<span>' + extra + '</span>' : '') + '</span><span class="a">' + (podeEditar() && st(l).k !== 'paga' && st(l).k !== 'cancelada' ? '<button class="btn xs" data-a="pagar" data-id="' + l.id + '">Pagar</button>' : '') + '</span></div>';
+    '<span class="s">' + pill(l) + tagRec(l) + diasTxt(l) + (extra ? '<span>' + extra + '</span>' : '') + '</span><span class="a">' + (podeEditar() && st(l).k !== 'paga' && st(l).k !== 'cancelada' ? '<button class="btn xs" data-a="pagar" data-id="' + l.id + '">Pagar</button>' : '') + '</span></div>';
 }
 const HEAD = { desc: 'Despesa', comp: 'Comp.', resp: 'Responsável', cc: 'Centro de custo', cat: 'Categoria', venc: 'Vencimento', pag: 'Pagamento', dias: 'Prazo', valor: 'Valor', pago: 'Valor pago', status: 'Status', acoes: '' };
 function tabela(ls, cols, rodape) {
@@ -310,17 +310,19 @@ PAGES.apagar = {
     let ls = S.lanc.filter(aPagar);
     ls = filtrarLanc(ls, { mes: f.mes, categoria: f.categoria, responsavel: f.responsavel });
     if (f.status) ls = ls.filter(l => f.status === 'pendente' ? st(l).aberta && st(l).k !== 'atrasada' : st(l).k === f.status);
+    if (f.origem) ls = ls.filter(l => f.origem === 'rec' ? !!l.recorrente_id : !l.recorrente_id);
     const tot = soma(ls, l => +l.valor), atr = soma(ls.filter(l => st(l).k === 'atrasada'), l => +l.valor), prox = soma(ls.filter(l => ['hoje', 'semana'].includes(st(l).k)), l => +l.valor);
     const meses = mesesComDados();
     const grupos = FAIXAS.map(([g, t, c]) => [g, t, c, ls.filter(l => st(l).grupo === g).sort((a, b) => (a.vencimento || a.agendado_para || '9') < (b.vencimento || b.agendado_para || '9') ? -1 : 1)]).filter(x => x[3].length);
-    return pageHead('Contas a pagar', 'Tudo o que ainda precisa ser pago, separado por prazo') +
+    return pageHead('Contas a pagar', 'Tudo o que ainda precisa ser pago, separado por prazo. As contas recorrentes do mês entram aqui automaticamente.') +
       '<div class="kpis k3"><div class="kpi"><div class="l">TOTAL A PAGAR</div><div class="v num">' + brl(tot) + '</div><div class="s">' + ls.length + ' conta(s) pendente(s)</div></div>' +
       '<div class="kpi crit"><div class="l"><i style="background:var(--crit)"></i>TOTAL ATRASADO</div><div class="v num">' + brl(atr) + '</div><div class="s">' + ls.filter(l => st(l).k === 'atrasada').length + ' conta(s) vencida(s)</div></div>' +
       '<div class="kpi warn"><div class="l"><i style="background:var(--warn)"></i>PRÓXIMOS VENCIMENTOS</div><div class="v num">' + brl(prox) + '</div><div class="s">hoje até ' + dd(addDias(S.hoje, 7)) + '</div></div></div>' +
       '<div class="filters"><span class="lbl">Filtrar</span><select class="inp sm" data-f="mes"><option value="">Todos os meses</option>' + meses.map(k => '<option value="' + k + '"' + (f.mes === k ? ' selected' : '') + '>' + mesTitulo(k) + '</option>').join('') + '</select>' +
       '<select class="inp sm" data-f="categoria">' + opts(C.lista('categoria', f.categoria), f.categoria, 'Todas as categorias') + '</select>' +
       '<select class="inp sm" data-f="responsavel">' + opts(C.lista('responsavel', f.responsavel), f.responsavel, 'Todos os responsáveis') + '</select>' +
-      '<select class="inp sm" data-f="status">' + optsTxt([['', 'Todos os status'], ['atrasada', 'Atrasadas'], ['pendente', 'Pendentes no prazo'], ['agendada', 'Agendadas']], f.status || '') + '</select></div>' +
+      '<select class="inp sm" data-f="status">' + optsTxt([['', 'Todos os status'], ['atrasada', 'Atrasadas'], ['pendente', 'Pendentes no prazo'], ['agendada', 'Agendadas']], f.status || '') + '</select>' +
+      '<select class="inp sm" data-f="origem">' + optsTxt([['', 'Recorrentes e avulsas'], ['rec', 'Só recorrentes'], ['avulsa', 'Só avulsas']], f.origem || '') + '</select></div>' +
       (grupos.length ? grupos.map(([g, t, c, gl]) => '<div class="group"><div class="group-h"><h3>' + t + '</h3><span class="tag ' + c + '">' + gl.length + '</span><span class="sum num">' + brl(soma(gl, l => +l.valor)) + '</span></div>' +
         tabela(gl, ['desc', 'comp', 'resp', 'venc', 'dias', 'valor', 'status', 'acoes']) + '</div>').join('')
         : '<div class="tbl-wrap"><div class="empty"><b>Nada a pagar</b>Nenhuma conta pendente para os filtros escolhidos.</div></div>');

@@ -173,6 +173,7 @@ const diasTxt = l => {
   if (s.n === 0) return '<span class="dias warn">hoje</span>';
   return '<span class="dias ' + (s.n <= 7 ? 'warn' : 'ok') + '">em ' + s.n + (s.n === 1 ? ' dia' : ' dias') + '</span>';
 };
+const tagRec = l => l.recorrente_id ? '<span class="tagrec" title="Gerada a partir de uma conta recorrente">↻ Recorrente</span>' : '';
 const pill = l => { const s = st(l); return '<span class="pill p-' + s.k + '"><i></i>' + esc(s.t) + '</span>'; };
 function resumo(ls) {
   const vivos = ls.filter(l => !l.cancelado);
@@ -316,9 +317,13 @@ async function iniciarApp() {
     S.perfil = data;
     if (!data || !data.ativo) return telaAcesso('aguardando');
     await carregarTudo();
+    // Lança automaticamente as contas recorrentes do mês atual (nunca duplica nem recria excluídas)
+    let geradas = 0;
+    if (podeEditar()) { try { geradas = await DB.rpc('gerar_recorrentes', { p_inicio: mesKey(S.hoje) + '-01', p_meses: 1 }) || 0; if (geradas) await carregarTudo(); } catch (e) { console.warn(e); } }
     $('#auth').hidden = true; $('#app').hidden = false;
     if (!location.hash || location.hash === '#') location.hash = '#/painel';
     render();
+    if (geradas) toast(geradas + ' conta(s) recorrente(s) de ' + mesLabel(mesKey(S.hoje)) + ' lançada(s) em Contas a pagar.');
   } catch (e) { telaAcesso('entrar', e.message); }
 }
 

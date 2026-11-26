@@ -165,6 +165,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .tbl .desc small{color:var(--muted);font-size:12px}
 .tbl .acts{white-space:nowrap;text-align:right;width:1%}
 .tbl.static tbody tr{cursor:default}
+.tagrec{display:inline-block;font-size:11px;font-weight:600;color:var(--info);background:var(--info-soft);border-radius:6px;padding:1px 6px;margin-right:6px;white-space:nowrap}
 .flag{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-left:6px;vertical-align:middle}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
 .pill i{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}

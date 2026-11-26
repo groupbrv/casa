@@ -344,7 +344,8 @@ begin
            r.observacoes, r.id, 'recorrencia'
     from public.recorrentes r
     where r.ativo and r.excluido_em is null and r.inicio <= comp and (r.fim is null or r.fim >= comp)
-      and not exists (select 1 from public.lancamentos l where l.recorrente_id = r.id and l.competencia = comp and l.excluido_em is null)
+      -- não recria o que já existe, nem o que foi excluído (lixeira) ou cancelado naquele mês
+      and not exists (select 1 from public.lancamentos l where l.recorrente_id = r.id and l.competencia = comp)
     on conflict do nothing;
     get diagnostics k = row_count; n := n + k;
   end loop;
