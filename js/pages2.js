@@ -19,9 +19,9 @@ PAGES.cadastros = {
   html(sub) {
     const tab = CAD_TABS.find(t => t[0] === sub) ? sub : 'responsavel';
     const abas = '<div class="tabs">' + CAD_TABS.map(t => '<a href="#/cadastros/' + t[0] + '" class="' + (t[0] === tab ? 'on' : '') + '">' + t[1] + '</a>').join('') + '</div>';
-    if (tab === 'recorrentes') return pageHead('Cadastros', 'Contas que se repetem e geram lançamentos automaticamente', podeEditar() ? '<button class="btn" data-a="gerarMesModal">Gerar competências</button><button class="btn pri" data-a="novaRec">' + ic('mais') + 'Nova recorrente</button>' : '') + abas + tabelaRec();
+    if (tab === 'recorrentes') return pageHead('Cadastros · ' + espNome(S.esp), 'Contas que se repetem e entram sozinhas em Contas a pagar todo mês', podeEditar() ? '<button class="btn" data-a="gerarMesModal">Gerar competências</button><button class="btn pri" data-a="novaRec">' + ic('mais') + 'Nova recorrente</button>' : '') + abas + tabelaRec();
     const lista = S.cad.filter(c => c.tipo === tab).sort((a, b) => (b.ativo - a.ativo) || a.ordem - b.ordem || a.nome.localeCompare(b.nome));
-    return pageHead('Cadastros', 'Itens que alimentam os formulários. Desativar esconde dos formulários sem apagar o histórico.', podeEditar() ? '<button class="btn pri" data-a="novoCad" data-v="' + tab + '">' + ic('mais') + 'Adicionar</button>' : '') + abas +
+    return pageHead('Cadastros · ' + espNome(S.esp), 'Itens desta área que alimentam os formulários. Desativar esconde dos formulários sem apagar o histórico.', podeEditar() ? '<button class="btn pri" data-a="novoCad" data-v="' + tab + '">' + ic('mais') + 'Adicionar</button>' : '') + abas +
       '<div class="tbl-wrap"><table class="tbl static"><thead><tr><th>Nome</th>' + (tab === 'tipo_despesa' ? '<th>Natureza</th>' : '') + '<th class="r">Uso</th><th>Situação</th><th></th></tr></thead><tbody>' +
       (lista.length ? lista.map(c => '<tr><td><b>' + esc(c.nome) + '</b></td>' + (tab === 'tipo_despesa' ? '<td>' + (c.natureza === 'fixa' ? 'Fixa' : 'Variável') + '</td>' : '') + '<td class="r num">' + usoCad(c.id) + '</td><td>' + (c.ativo ? '<span class="pill p-paga"><i></i>Ativo</span>' : '<span class="pill p-inativo"><i></i>Inativo</span>') + '</td>' +
         '<td class="acts">' + (podeEditar() ? '<button class="btn xs" data-a="editCad" data-id="' + c.id + '">Editar</button> <button class="btn xs" data-a="togCad" data-id="' + c.id + '">' + (c.ativo ? 'Desativar' : 'Ativar') + '</button>' : '') + '</td></tr>').join('') : '<tr><td colspan="5"><div class="empty">Nenhum cadastro.</div></td></tr>') + '</tbody></table></div>';
@@ -136,7 +136,7 @@ PAGES.relatorios = {
   html() {
     const f = S.ui.rel; const T = dadosRelatorio();
     const anos = uniq(S.lanc.map(l => l.competencia.slice(0, 4)).concat([S.hoje.slice(0, 4)])).sort();
-    return pageHead('Relatórios', T.titulo + ' · ' + T.periodo, '<button class="btn" data-a="relXls">' + ic('baixar') + 'Excel</button><button class="btn" data-a="relPdf">' + ic('imp') + 'PDF</button>') +
+    return pageHead('Relatórios · ' + (S.esp === 'todos' ? 'Todas as áreas' : espNome(S.esp)), T.titulo + ' · ' + T.periodo, '<button class="btn" data-a="relXls">' + ic('baixar') + 'Excel</button><button class="btn" data-a="relPdf">' + ic('imp') + 'PDF</button>') +
       '<div class="filters"><select class="inp sm" data-f="tipo">' + optsTxt(RELS, f.tipo) + '</select>' +
       (f.tipo !== 'anual' ? '<select class="inp sm" data-f="ano">' + anos.map(a => '<option' + ((f.ano || S.hoje.slice(0, 4)) === a ? ' selected' : '') + '>' + a + '</option>').join('') + '</select><input class="inp sm" type="month" data-f="de" value="' + esc(f.de || '') + '" title="De (opcional)"><input class="inp sm" type="month" data-f="ate" value="' + esc(f.ate || '') + '" title="Até (opcional)">' : '') +
       (f.tipo !== 'economias' ? '<select class="inp sm" data-f="categoria">' + opts(C.lista('categoria', f.categoria), f.categoria, 'Categoria') + '</select><select class="inp sm" data-f="responsavel">' + opts(C.lista('responsavel', f.responsavel), f.responsavel, 'Responsável') + '</select><select class="inp sm" data-f="centro">' + opts(C.lista('centro_custo', f.centro), f.centro, 'Centro de custo') + '</select>' : '') + '</div>' +
@@ -154,7 +154,7 @@ Object.assign(ACTIONS, {
     try {
       const T = dadosRelatorio();
       const linhas = T.linhas.concat(T.total ? [T.total] : []).map(l => Object.fromEntries(T.colunas.map((c, i) => [c, l[i]])));
-      await exportarExcel('Casa - ' + T.titulo + ' - ' + T.periodo.replace(/\//g, '-'), [[T.titulo, linhas]]);
+      await exportarExcel('BRV360 - ' + (S.esp === 'todos' ? 'Todas as areas' : espNome(S.esp)) + ' - ' + T.titulo + ' - ' + T.periodo.replace(/\//g, '-'), [[T.titulo, linhas]]);
     } catch (e) { toast(e.message, true); } finally { el.disabled = false; }
   }
 });
@@ -186,32 +186,50 @@ CFG.conta = {
 ACTIONS.sairTodos = async () => { if (await confirmar('Sair de todos os aparelhos?', 'Você precisará entrar de novo em todos os aparelhos, inclusive neste.', 'Sair de todos')) await S.sb.auth.signOut({ scope: 'global' }); };
 
 CFG.usuarios = {
-  html: () => '<div class="cards"><div class="card c7"><h3>Usuários</h3><div id="usrs" class="muted">Carregando…</div></div><div class="card c5"><h3>Convidar pessoa</h3><form id="fCv"><div class="field"><label>Nome</label><input class="inp" id="cvN" required maxlength="60"></div><div class="field"><label>E-mail</label><input class="inp" id="cvE" type="email" required></div><div class="field"><label>Nível de acesso</label><select class="inp" id="cvP">' + optsTxt([['editor', 'Editor — lança e edita'], ['leitor', 'Somente leitura'], ['admin', 'Administrador — tudo']], 'editor') + '</select></div><div class="err" id="cvErr"></div><button class="btn pri" id="cvS">Criar convite</button></form>' +
+  html: () => '<div class="cards"><div class="card c7"><h3>Usuários</h3><div id="usrs" class="muted">Carregando…</div></div><div class="card c5"><h3>Convidar pessoa</h3><form id="fCv"><div class="field"><label>Nome</label><input class="inp" id="cvN" required maxlength="60"></div><div class="field"><label>E-mail</label><input class="inp" id="cvE" type="email" required></div><div class="field"><label>Áreas que pode ver</label><div class="chips" id="cvA">' + S.espacos.map(e => '<label class="chip on"><input type="checkbox" value="' + e.id + '" checked style="margin:0 4px 0 0">' + esc(e.nome) + '</label>').join('') + '</div><span class="hint">Desmarque as áreas que a pessoa não deve ver.</span></div><div class="field"><label>Nível de acesso</label><select class="inp" id="cvP">' + optsTxt([['editor', 'Editor — lança e edita'], ['leitor', 'Somente leitura'], ['admin', 'Administrador — tudo']], 'editor') + '</select></div><div class="err" id="cvErr"></div><button class="btn pri" id="cvS">Criar convite</button></form>' +
     '<div class="infobox" style="margin-top:14px">Depois do convite, a pessoa abre <b>' + esc(location.host) + '</b>, clica em <b>“Recebi um convite”</b> e cria a senha com esse mesmo e-mail. Só e-mails convidados recebem acesso.</div><div id="cvs"></div></div></div>',
   async mount() {
     const papel = { admin: 'Administrador', editor: 'Editor', leitor: 'Somente leitura' };
     const [{ data: us }, { data: cv }] = await Promise.all([S.sb.from('perfis').select('*').order('criado_em'), S.sb.from('convites').select('*').order('criado_em', { ascending: false })]);
-    $('#usrs').innerHTML = '<table class="tbl static"><thead><tr><th>Nome</th><th>Acesso</th><th>Situação</th><th></th></tr></thead><tbody>' + (us || []).map(u => '<tr><td class="desc"><b>' + esc(u.nome) + '</b><small>' + esc(u.email || '') + '</small></td><td>' + (u.user_id === S.perfil.user_id ? papel[u.papel] : '<select class="inp sm" data-u="' + u.user_id + '">' + optsTxt(Object.entries(papel), u.papel) + '</select>') + '</td><td>' + (u.ativo ? '<span class="pill p-paga"><i></i>Ativo</span>' : '<span class="pill p-inativo"><i></i>Bloqueado</span>') + '</td><td class="acts">' + (u.user_id === S.perfil.user_id ? '<span class="muted">você</span>' : '<button class="btn xs" data-a="togUser" data-id="' + u.user_id + '" data-v="' + (u.ativo ? 0 : 1) + '">' + (u.ativo ? 'Bloquear' : 'Liberar') + '</button>') + '</td></tr>').join('') + '</tbody></table>';
-    $$('[data-u]').forEach(s => s.onchange = async () => { const u = us.find(x => x.user_id === s.dataset.u); try { await DB.rpc('definir_acesso', { p_user: u.user_id, p_papel: s.value, p_ativo: u.ativo }); toast('Acesso atualizado.'); } catch (e) { toast(e.message, true); } render(); });
-    $('#cvs').innerHTML = (cv || []).length ? '<h3 style="margin-top:16px">Convites</h3>' + cv.map(c => '<div class="ap"><span>' + (c.usado_em ? 'usado' : 'pendente') + '</span><span>' + esc(c.nome) + ' · ' + esc(c.email) + '</span>' + (c.usado_em ? '' : '<b><button class="btn xs danger" data-a="delConvite" data-v="' + esc(c.email) + '">Remover</button></b>') + '</div>').join('') : '';
+    const areasTxt = u => !u.espacos || !u.espacos.length ? 'Todas as áreas' : u.espacos.map(espNome).filter(Boolean).join(', ');
+    $('#usrs').innerHTML = '<table class="tbl static"><thead><tr><th>Nome</th><th>Acesso</th><th>Situação</th><th></th></tr></thead><tbody>' + (us || []).map(u => '<tr><td class="desc"><b>' + esc(u.nome) + '</b><small>' + esc(u.email || '') + ' · ' + esc(areasTxt(u)) + (u.user_id === S.perfil.user_id ? '' : ' · <a data-a="areasUser" data-id="' + u.user_id + '" style="cursor:pointer">alterar áreas</a>') + '</small></td><td>' + (u.user_id === S.perfil.user_id ? papel[u.papel] : '<select class="inp sm" data-u="' + u.user_id + '">' + optsTxt(Object.entries(papel), u.papel) + '</select>') + '</td><td>' + (u.ativo ? '<span class="pill p-paga"><i></i>Ativo</span>' : '<span class="pill p-inativo"><i></i>Bloqueado</span>') + '</td><td class="acts">' + (u.user_id === S.perfil.user_id ? '<span class="muted">você</span>' : '<button class="btn xs" data-a="togUser" data-id="' + u.user_id + '" data-v="' + (u.ativo ? 0 : 1) + '">' + (u.ativo ? 'Bloquear' : 'Liberar') + '</button>') + '</td></tr>').join('') + '</tbody></table>';
+    $$('[data-u]').forEach(s => s.onchange = async () => { const u = us.find(x => x.user_id === s.dataset.u); try { await DB.rpc('definir_acesso', { p_user: u.user_id, p_papel: s.value, p_ativo: u.ativo, p_espacos: u.espacos }); toast('Acesso atualizado.'); } catch (e) { toast(e.message, true); } render(); });
+    CFG.usuarios.lista = us || [];
+    $('#cvs').innerHTML = (cv || []).length ? '<h3 style="margin-top:16px">Convites</h3>' + cv.map(c => '<div class="ap"><span>' + (c.usado_em ? 'usado' : 'pendente') + '</span><span>' + esc(c.nome) + ' · ' + esc(c.email) + ' · ' + esc(areasTxt(c)) + '</span>' + (c.usado_em ? '' : '<b><button class="btn xs danger" data-a="delConvite" data-v="' + esc(c.email) + '">Remover</button></b>') + '</div>').join('') : '';
     $('#fCv').onsubmit = async e => {
       e.preventDefault();
-      try { await DB.insert('convites', { email: $('#cvE').value.trim().toLowerCase(), nome: $('#cvN').value.trim(), papel: $('#cvP').value, criado_por: S.perfil.user_id }); toast('Convite criado. Avise a pessoa para criar o acesso.'); render(); }
+      const areas = $$('#cvA input:checked').map(i => i.value);
+      if (!areas.length) return $('#cvErr').textContent = 'Escolha pelo menos uma área.';
+      try { await DB.insert('convites', { email: $('#cvE').value.trim().toLowerCase(), nome: $('#cvN').value.trim(), papel: $('#cvP').value, criado_por: S.perfil.user_id, espacos: areas.length === S.espacos.length ? null : areas }); toast('Convite criado. Avise a pessoa para criar o acesso.'); render(); }
       catch (err) { $('#cvErr').textContent = /duplicate|unique/.test(err.message) ? 'Já existe convite para esse e-mail.' : err.message; }
     };
   }
 };
 Object.assign(ACTIONS, {
-  togUser: async el => { const { data: u } = await S.sb.from('perfis').select('*').eq('user_id', el.dataset.id).single(); try { await DB.rpc('definir_acesso', { p_user: u.user_id, p_papel: u.papel, p_ativo: el.dataset.v === '1' }); toast(el.dataset.v === '1' ? 'Usuário liberado.' : 'Usuário bloqueado.'); } catch (e) { toast(e.message, true); } render(); },
+  areasUser: el => {
+    const u = (CFG.usuarios.lista || []).find(x => x.user_id === el.dataset.id); if (!u) return;
+    const tem = id => !u.espacos || !u.espacos.length || u.espacos.includes(id);
+    abrirModal('Áreas de ' + esc(u.nome), '<form id="fAr"><div class="chips" id="arA">' + S.espacos.map(e => '<label class="chip on"><input type="checkbox" value="' + e.id + '"' + (tem(e.id) ? ' checked' : '') + ' style="margin:0 4px 0 0">' + esc(e.nome) + '</label>').join('') + '</div><p class="muted" style="font-size:13px">A pessoa só vê, lança e paga contas das áreas marcadas.</p><div class="err" id="arErr"></div><div class="mf"><button type="button" class="btn" data-a="fechar">Cancelar</button><button class="btn pri" id="arS">Salvar</button></div></form>', {
+      classe: 'sm', onMount: m => {
+        $('#fAr', m).onsubmit = async e => {
+          e.preventDefault(); const areas = $$('#arA input:checked').map(i => i.value);
+          if (!areas.length) return $('#arErr').textContent = 'Escolha pelo menos uma área.';
+          try { await DB.rpc('definir_acesso', { p_user: u.user_id, p_papel: u.papel, p_ativo: u.ativo, p_espacos: areas.length === S.espacos.length ? null : areas }); fecharModal(); toast('Áreas atualizadas.'); render(); } catch (err) { $('#arErr').textContent = err.message; }
+        };
+      }
+    });
+  },
+  togUser: async el => { const { data: u } = await S.sb.from('perfis').select('*').eq('user_id', el.dataset.id).single(); try { await DB.rpc('definir_acesso', { p_user: u.user_id, p_papel: u.papel, p_ativo: el.dataset.v === '1', p_espacos: u.espacos }); toast(el.dataset.v === '1' ? 'Usuário liberado.' : 'Usuário bloqueado.'); } catch (e) { toast(e.message, true); } render(); },
   delConvite: async el => { try { await DB.remove('convites', el.dataset.v, 'email'); toast('Convite removido.'); } catch (e) { toast(e.message, true); } render(); }
 });
 
 /* ---------- Importação de Excel (mesmo formato da planilha original) ---------- */
 let IMP = null;
 CFG.importar = {
-  html: () => '<div class="card"><h3>Importar lançamentos de um arquivo Excel</h3><p class="muted" style="margin:-6px 0 14px">Use o formato da planilha original (aba <b>Base Financeira</b>, com as colunas Empresa, Competência, Vencimento Original, Data de Pagamento, Centro de Custo, Categoria, Despesa, Tipo, Valor e Observações). Linhas vazias e linhas já importadas são ignoradas automaticamente. Nada é gravado antes da sua confirmação.</p>' +
+  html: () => S.esp === 'todos' ? '<div class="warnbox">Escolha uma área no menu (Casa, Bravus, Bravinhos ou Hub) para importar. Os lançamentos entram só na área escolhida.</div>' : '<div class="card"><h3>Importar lançamentos para: ' + esc(espNome(S.esp)) + '</h3><p class="muted" style="margin:-6px 0 14px">Use o formato da planilha original (aba <b>Base Financeira</b>, com as colunas Empresa, Competência, Vencimento Original, Data de Pagamento, Centro de Custo, Categoria, Despesa, Tipo, Valor e Observações). Linhas vazias e linhas já importadas são ignoradas automaticamente. Nada é gravado antes da sua confirmação.</p>' +
     '<input type="file" id="impF" accept=".xlsx,.xlsm,.xls" class="inp" style="padding:7px"><div id="impR" style="margin-top:16px"></div></div><div class="card" style="margin-top:16px"><h3>Importações anteriores</h3><div id="impH" class="muted">Carregando…</div></div>',
   async mount() {
+    if (!$('#impF')) return;
     $('#impF').onchange = async e => { const f = e.target.files[0]; if (!f) return; $('#impR').innerHTML = '<div class="muted">Lendo arquivo…</div>'; try { await carregarXLSX(); IMP = analisarPlanilha(XLSX.read(await f.arrayBuffer(), { cellDates: true }), f.name); mostrarImport(); } catch (err) { $('#impR').innerHTML = '<div class="warnbox">' + esc(err.message) + '</div>'; } };
     const { data } = await S.sb.from('importacoes').select('*').order('criado_em', { ascending: false }).limit(20);
     $('#impH').innerHTML = (data || []).length ? '<table class="tbl static"><thead><tr><th>Data</th><th>Arquivo</th><th class="r">Lidas</th><th class="r">Importadas</th><th class="r">Ignoradas</th><th class="r">Total</th></tr></thead><tbody>' + data.map(i => '<tr><td>' + new Date(i.criado_em).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }) + '</td><td>' + esc(i.arquivo) + '</td><td class="r">' + i.lidas + '</td><td class="r">' + i.importadas + '</td><td class="r">' + i.ignoradas + '</td><td class="r num">' + brl(i.total) + '</td></tr>').join('') + '</tbody></table>' : 'Nenhuma importação.';
@@ -284,9 +302,13 @@ Object.assign(ACTIONS, {
 /* ---------- Lixeira ---------- */
 const LIX = [['lancamentos', 'Contas', x => x.descricao + ' · ' + mesCurto(mesKey(x.competencia)) + ' · ' + brl(x.valor)], ['recorrentes', 'Recorrentes', x => x.descricao + ' · ' + brl(x.valor)], ['metas', 'Metas', x => x.nome + ' · ' + brl(x.valor_meta)], ['aportes', 'Aportes', x => x.descricao + ' · ' + brl(x.valor)]];
 CFG.lixeira = {
-  html: () => '<div class="infobox">Itens excluídos ficam aqui e não entram em nenhum total. Restaure se foi engano. A exclusão definitiva não pode ser desfeita.</div><div id="lix" class="muted">Carregando…</div>',
+  html: () => '<div class="infobox"><b>' + esc(S.esp === 'todos' ? 'Todas as áreas' : espNome(S.esp)) + ':</b> itens excluídos ficam aqui e não entram em nenhum total. Restaure se foi engano. A exclusão definitiva não pode ser desfeita.</div><div id="lix" class="muted">Carregando…</div>',
   async mount() {
-    const res = await Promise.all(LIX.map(([t]) => DB.all(t, { mortos: true, order: 'excluido_em', desc: true })));
+    let res = await Promise.all(LIX.map(([t]) => DB.all(t, { mortos: true, order: 'excluido_em', desc: true })));
+    if (S.esp !== 'todos') {
+      const metasArea = new Set(S.A.metas.filter(m => m.espaco_id === S.esp).map(m => m.id).concat(res[2].filter(m => m.espaco_id === S.esp).map(m => m.id)));
+      res = res.map((lista, i) => LIX[i][0] === 'aportes' ? lista.filter(a => metasArea.has(a.meta_id)) : lista.filter(x => x.espaco_id === S.esp));
+    }
     const html = LIX.map(([t, nome, fmt], i) => res[i].length ? '<h3 style="font-size:14px;margin:16px 0 8px">' + nome + ' (' + res[i].length + ')</h3><div class="tbl-wrap"><table class="tbl static"><tbody>' + res[i].map(x => '<tr><td>' + esc(fmt(x)) + '</td><td class="muted" style="font-size:12.5px">excluído em ' + new Date(x.excluido_em).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }) + '</td><td class="acts"><button class="btn xs" data-a="lixRest" data-t="' + t + '" data-id="' + x.id + '">Restaurar</button> <button class="btn xs danger" data-a="lixDel" data-t="' + t + '" data-id="' + x.id + '">Excluir definitivamente</button></td></tr>').join('') + '</tbody></table></div>' : '').join('');
     $('#lix').innerHTML = html || '<div class="empty"><b>Lixeira vazia</b></div>';
   }
@@ -302,6 +324,7 @@ CFG.historico = {
   async mount() {
     const load = async () => {
       let q = S.sb.from('auditoria').select('*').order('quando', { ascending: false }).limit(300); if ($('#hT').value) q = q.eq('tabela', $('#hT').value);
+      if (S.esp !== 'todos') q = q.eq('espaco_id', S.esp);
       const { data, error } = await q; if (error) return $('#hist').textContent = traduz(error).message;
       const nomeReg = a => { const o = a.depois || a.antes || {}; return o.descricao || o.nome || o.email || ''; };
       $('#hist').outerHTML = '<table class="tbl static" id="hist"><thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Registro</th><th>Detalhe</th></tr></thead><tbody>' + data.map(a => '<tr><td style="white-space:nowrap">' + new Date(a.quando).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }) + '</td><td>' + esc(a.usuario_nome) + '</td><td>' + esc(a.acao) + '</td><td>' + esc(nomeReg(a)) + ' <small class="muted">(' + esc(a.tabela) + ')</small></td><td style="font-size:12.5px;color:var(--muted)">' + resumoMudanca(a).replace(/^: /, '') + '</td></tr>').join('') + '</tbody></table>';
@@ -321,9 +344,10 @@ ACTIONS.backupXls = async el => {
   try {
     const nomeCad = id => C.nome(id);
     const [lanc, rec, metas, aportes] = await Promise.all(['lancamentos', 'recorrentes', 'metas', 'aportes'].map(t => DB.all(t)));
-    const L = lanc.map(l => ({ Empresa: nomeCad(l.empresa_id), 'Competência': mesKey(l.competencia), Vencimento: l.vencimento, 'Data de Pagamento': l.pagamento, 'Centro de Custo': nomeCad(l.centro_custo_id), Categoria: nomeCad(l.categoria_id), Despesa: l.descricao, Tipo: nomeCad(l.tipo_id), Valor: +l.valor, 'Valor Pago': l.valor_pago != null ? +l.valor_pago : null, Status: st(l).t, 'Responsável': nomeCad(l.responsavel_id), 'Observações': l.observacoes, Cancelada: l.cancelado ? 'sim' : '', 'Na lixeira': l.excluido_em ? 'sim' : '', ID: l.id }));
-    await exportarExcel('Casa - backup ' + S.hoje, [['Base Financeira', L], ['Recorrentes', rec.map(r => ({ Despesa: r.descricao, Valor: +r.valor, Dia: r.dia_vencimento, 'Início': mesKey(r.inicio), Fim: r.fim ? mesKey(r.fim) : '', Ativa: r.ativo ? 'sim' : 'não', Categoria: nomeCad(r.categoria_id), 'Responsável': nomeCad(r.responsavel_id), ID: r.id }))],
-      ['Metas', metas.map(m => ({ Meta: m.nome, Valor: +m.valor_meta, 'Data limite': m.data_limite, Ativa: m.ativo ? 'sim' : 'não', ID: m.id }))], ['Aportes', aportes.map(a => ({ Meta: (metas.find(m => m.id === a.meta_id) || {}).nome, Data: a.data, 'Descrição': a.descricao, Valor: +a.valor, ID: a.id }))],
-      ['Cadastros', S.cad.map(c => ({ Tipo: c.tipo, Nome: c.nome, Ativo: c.ativo ? 'sim' : 'não', ID: c.id }))]]);
+    const C2 = id => (S.A.cad.find(c => c.id === id) || {}).nome || '';
+    const L = lanc.map(l => ({ 'Área': espNome(l.espaco_id), Empresa: C2(l.empresa_id), 'Competência': mesKey(l.competencia), Vencimento: l.vencimento, 'Data de Pagamento': l.pagamento, 'Centro de Custo': C2(l.centro_custo_id), Categoria: C2(l.categoria_id), Despesa: l.descricao, Tipo: C2(l.tipo_id), Valor: +l.valor, 'Valor Pago': l.valor_pago != null ? +l.valor_pago : null, Status: st(l).t, 'Responsável': C2(l.responsavel_id), 'Observações': l.observacoes, Cancelada: l.cancelado ? 'sim' : '', 'Na lixeira': l.excluido_em ? 'sim' : '', ID: l.id }));
+    await exportarExcel('BRV360 - backup ' + S.hoje, [['Base Financeira', L], ['Recorrentes', rec.map(r => ({ 'Área': espNome(r.espaco_id), Despesa: r.descricao, Valor: +r.valor, Dia: r.dia_vencimento, 'Início': mesKey(r.inicio), Fim: r.fim ? mesKey(r.fim) : '', Ativa: r.ativo ? 'sim' : 'não', Categoria: nomeCad(r.categoria_id), 'Responsável': nomeCad(r.responsavel_id), ID: r.id }))],
+      ['Metas', metas.map(m => ({ 'Área': espNome(m.espaco_id), Meta: m.nome, Valor: +m.valor_meta, 'Data limite': m.data_limite, Ativa: m.ativo ? 'sim' : 'não', ID: m.id }))], ['Aportes', aportes.map(a => ({ Meta: (metas.find(m => m.id === a.meta_id) || {}).nome, Data: a.data, 'Descrição': a.descricao, Valor: +a.valor, ID: a.id }))],
+      ['Cadastros', S.A.cad.map(c => ({ 'Área': espNome(c.espaco_id), Tipo: c.tipo, Nome: c.nome, Ativo: c.ativo ? 'sim' : 'não', ID: c.id }))]]);
   } catch (e) { toast(e.message, true); } finally { el.disabled = false; busy(false); }
 };

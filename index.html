@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Casa • Gestão Financeira Familiar</title>
+<title>BRV360 • Gestão Financeira</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="theme-color" content="#1B2A4A">
@@ -12,33 +12,35 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Casa">
+<meta name="apple-mobile-web-app-title" content="BRV360">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 <div id="bar"></div>
 <div id="auth" class="auth" hidden></div>
 <div id="app" class="layout" hidden>
   <aside class="side" id="side">
-    <div class="brand"><div class="logo"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></div><div>Casa<small>Gestão Financeira Familiar</small></div></div>
+    <div class="brand"><div class="logo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 8.2 6.3"/><path d="m20.6 6.4-.4 3.4-3.3-.8"/><circle cx="12" cy="12" r="2.2"/></svg></div><div>BRV360<small>Casa e empresas</small></div></div>
+    <div class="areas" id="areas"></div>
     <nav class="nav" id="nav"></nav>
     <div class="me"><div class="avatar" id="meAv"></div><div class="t"><b id="meNome"></b><small id="mePapel"></small></div><button data-a="sair" title="Sair" aria-label="Sair"><svg class="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button></div>
   </aside>
   <div class="main">
-    <header class="topbar"><button class="btn icon ghost" data-a="abrirSide" aria-label="Menu"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><b id="tbTitulo">Casa</b><span class="sp"></span></header>
+    <header class="topbar"><button class="btn icon ghost" data-a="abrirSide" aria-label="Menu"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><b id="tbTitulo">BRV360</b><span class="sp"></span><span id="tbArea"></span></header>
     <main class="page" id="page"></main>
   </div>
   <nav class="bottomnav" id="bnav"></nav>
 </div>
 <div id="veil" data-a="fechar"></div>
 <div id="modal" class="modal" role="dialog" aria-modal="true"></div>
+<div id="selbar" class="selbar" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=3"></script>
-<script src="js/core.js?v=3"></script>
-<script src="js/pages.js?v=3"></script>
-<script src="js/pages2.js?v=3"></script>
+<script src="js/config.js?v=4"></script>
+<script src="js/core.js?v=4"></script>
+<script src="js/pages.js?v=4"></script>
+<script src="js/pages2.js?v=4"></script>
 </body>
 </html>

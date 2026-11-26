@@ -28,6 +28,7 @@ const soma = (a, f) => a.reduce((s, x) => s + (f ? f(x) : x), 0);
 const uniq = a => [...new Set(a)];
 
 const ICON = {
+  logo: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 8.2 6.3"/><path d="m20.6 6.4-.4 3.4-3.3-.8"/><circle cx="12" cy="12" r="2.2"/>',
   dash: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   contas: '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
   apagar: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -49,7 +50,7 @@ const ic = k => '<svg class="i" viewBox="0 0 24 24">' + ICON[k] + '</svg>';
 /* ===================== Estado ===================== */
 const S = {
   sb: null, session: null, perfil: null, hoje: hojeLocal(),
-  cad: [], lanc: [], rec: [], metas: [], aportes: [],
+  cad: [], lanc: [], rec: [], metas: [], aportes: [], espacos: [], A: null, esp: null, sel: new Set(),
   ui: { mes: null, dash: {}, contas: { status: '', q: '' }, apagar: {}, pagas: { periodo: 'mes' }, rel: { tipo: 'mensal' } }
 };
 const C = {
@@ -79,6 +80,10 @@ const DB = {
     return out;
   },
   async insert(tabela, rows) {
+    if (['lancamentos', 'recorrentes', 'metas', 'cadastros', 'importacoes'].includes(tabela)) {
+      if (!S.esp || S.esp === 'todos') throw new Error('Escolha uma área (Casa, Bravus, Bravinhos ou Hub) antes de cadastrar.');
+      rows = (Array.isArray(rows) ? rows : [rows]).map(r => Object.assign({ espaco_id: S.esp }, r));
+    }
     const { data, error } = await S.sb.from(tabela).insert(rows).select();
     if (error) throw traduz(error); return data;
   },
@@ -118,15 +123,44 @@ function busy(on) { carregando += on ? 1 : -1; if (carregando < 0) carregando = 
 async function carregarTudo() {
   busy(true);
   try {
-    const [cad, lanc, rec, metas, aportes] = await Promise.all([
+    const [espacos, cad, lanc, rec, metas, aportes] = await Promise.all([
+      DB.all('espacos', { order: 'ordem' }),
       DB.all('cadastros', { order: 'nome' }),
       DB.all('lancamentos', { vivos: true }),
       DB.all('recorrentes', { vivos: true }),
       DB.all('metas', { vivos: true }),
       DB.all('aportes', { vivos: true })
     ]);
-    Object.assign(S, { cad, lanc, rec, metas, aportes, hoje: hojeLocal() });
+    S.A = { cad, lanc, rec, metas, aportes };
+    S.espacos = espacos.filter(e => e.ativo);
+    S.hoje = hojeLocal();
+    if (!S.esp || (S.esp !== 'todos' && !S.espacos.some(e => e.id === S.esp))) {
+      const pref = store('brv_esp');
+      S.esp = pref === 'todos' && S.espacos.length > 1 ? 'todos' : ((S.espacos.find(e => e.slug === pref) || S.espacos[0] || {}).id || null);
+    }
+    if (S.esp === 'todos' && S.espacos.length < 2) S.esp = (S.espacos[0] || {}).id;
+    if (!S.ultimaEsp) S.ultimaEsp = S.esp !== 'todos' ? S.esp : (S.espacos[0] || {}).id;
+    aplicarEspaco();
   } finally { busy(false); }
+}
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+const espNome = id => (S.espacos.find(e => e.id === id) || {}).nome || '';
+const espAtual = () => S.espacos.find(e => e.id === S.esp);
+function aplicarEspaco() {
+  const A = S.A; if (!A) return;
+  if (S.esp === 'todos') Object.assign(S, { cad: A.cad, lanc: A.lanc, rec: A.rec, metas: A.metas, aportes: A.aportes });
+  else {
+    const metas = A.metas.filter(m => m.espaco_id === S.esp), ids = new Set(metas.map(m => m.id));
+    Object.assign(S, { cad: A.cad.filter(c => c.espaco_id === S.esp), lanc: A.lanc.filter(l => l.espaco_id === S.esp), rec: A.rec.filter(r => r.espaco_id === S.esp), metas, aportes: A.aportes.filter(a => ids.has(a.meta_id)) });
+  }
+}
+function trocarEspaco(id) {
+  S.esp = id; S.sel.clear(); store('brv_esp', id === 'todos' ? 'todos' : ((S.espacos.find(e => e.id === id) || {}).slug || ''));
+  if (id !== 'todos') S.ultimaEsp = id;
+  S.ui.contas = { status: '', q: '' }; S.ui.apagar = {}; S.ui.dash = {}; S.ui.pagas.categoria = S.ui.pagas.responsavel = S.ui.pagas.centro = '';
+  aplicarEspaco();
+  if (id === 'todos' && !['painel', 'relatorios', 'config'].includes(rota().pg)) { location.hash = '#/painel'; return; }
+  render(); scrollTo(0, 0);
 }
 
 /* Executa uma ação, recarrega dados e redesenha */
@@ -282,7 +316,7 @@ function telaAcesso(modo, msg) {
   $('#app').hidden = true; const a = $('#auth'); a.hidden = false;
   const logo = '<div class="logo"><svg viewBox="0 0 24 24">' + ICON.casa + '</svg></div>';
   const forms = {
-    entrar: '<h1>Casa</h1><p class="sub">Gestão financeira da família</p><form id="fA"><div class="field"><label>E-mail</label><input class="inp" id="aE" type="email" autocomplete="username" required></div><div class="field"><label>Senha</label><input class="inp" id="aS" type="password" autocomplete="current-password" required></div><div class="err" id="aErr">' + esc(msg || '') + '</div><button class="btn pri block" id="aB">Entrar</button></form><div class="links"><a data-m="esqueci">Esqueci a senha</a><a data-m="criar">Recebi um convite</a></div>',
+    entrar: '<h1>BRV360</h1><p class="sub">Gestão financeira da casa e das empresas</p><form id="fA"><div class="field"><label>E-mail</label><input class="inp" id="aE" type="email" autocomplete="username" required></div><div class="field"><label>Senha</label><input class="inp" id="aS" type="password" autocomplete="current-password" required></div><div class="err" id="aErr">' + esc(msg || '') + '</div><button class="btn pri block" id="aB">Entrar</button></form><div class="links"><a data-m="esqueci">Esqueci a senha</a><a data-m="criar">Recebi um convite</a></div>',
     esqueci: '<h1>Recuperar senha</h1><p class="sub">Enviaremos um link para criar uma nova senha.</p><form id="fA"><div class="field"><label>E-mail</label><input class="inp" id="aE" type="email" required></div><div class="err" id="aErr">' + esc(msg || '') + '</div><button class="btn pri block" id="aB">Enviar link</button></form><div class="links"><a data-m="entrar">Voltar</a></div>',
     criar: '<h1>Criar acesso</h1><p class="sub">Só funciona para e-mails convidados por um administrador.</p><form id="fA"><div class="field"><label>Seu nome</label><input class="inp" id="aN" required></div><div class="field"><label>E-mail do convite</label><input class="inp" id="aE" type="email" autocomplete="username" required></div><div class="field"><label>Senha (mínimo 8 caracteres)</label><input class="inp" id="aS" type="password" autocomplete="new-password" minlength="8" required></div><div class="err" id="aErr">' + esc(msg || '') + '</div><button class="btn pri block" id="aB">Criar acesso</button></form><div class="links"><a data-m="entrar">Já tenho acesso</a></div>',
     novasenha: '<h1>Nova senha</h1><p class="sub">Escolha uma nova senha para entrar.</p><form id="fA"><div class="field"><label>Nova senha (mínimo 8 caracteres)</label><input class="inp" id="aS" type="password" autocomplete="new-password" minlength="8" required></div><div class="err" id="aErr">' + esc(msg || '') + '</div><button class="btn pri block" id="aB">Salvar senha</button></form>',
@@ -319,11 +353,11 @@ async function iniciarApp() {
     await carregarTudo();
     // Lança automaticamente as contas recorrentes do mês atual (nunca duplica nem recria excluídas)
     let geradas = 0;
-    if (podeEditar()) { try { geradas = await DB.rpc('gerar_recorrentes', { p_inicio: mesKey(S.hoje) + '-01', p_meses: 1 }) || 0; if (geradas) await carregarTudo(); } catch (e) { console.warn(e); } }
+    if (podeEditar()) { try { geradas = await DB.rpc('gerar_recorrentes', { p_inicio: mesKey(S.hoje) + '-01', p_meses: 1, p_espaco: null }) || 0; if (geradas) await carregarTudo(); } catch (e) { console.warn(e); } }
     $('#auth').hidden = true; $('#app').hidden = false;
     if (!location.hash || location.hash === '#') location.hash = '#/painel';
     render();
-    if (geradas) toast(geradas + ' conta(s) recorrente(s) de ' + mesLabel(mesKey(S.hoje)) + ' lançada(s) em Contas a pagar.');
+    if (geradas) toast(geradas + ' conta(s) recorrente(s) de ' + mesLabel(mesKey(S.hoje)) + ' lançada(s) em Contas a pagar (cada uma na sua área).');
   } catch (e) { telaAcesso('entrar', e.message); }
 }
 
@@ -339,8 +373,14 @@ function render() {
   if ($('#app').hidden) return;
   fecharMenu();
   const r = rota();
+  if (S.esp === 'todos' && !['painel', 'relatorios', 'config'].includes(r.pg)) { S.esp = S.ultimaEsp || (S.espacos[0] || {}).id; aplicarEspaco(); }
+  if (render.ultimaRota !== r.pg) { S.sel.clear(); render.ultimaRota = r.pg; }
   const atrasadas = S.lanc.filter(l => st(l).k === 'atrasada').length;
-  $('#nav').innerHTML = '<div class="sec">Visão</div>' + NAV.map((n, i) =>
+  const atrPorEsp = id => S.A.lanc.filter(l => l.espaco_id === id && st(l).k === 'atrasada').length;
+  $('#areas').innerHTML = '<div class="sec">Áreas</div>' + (S.espacos.length > 1 ? '<button class="area' + (S.esp === 'todos' ? ' on' : '') + '" data-a="area" data-v="todos"><i class="dot dot-all"></i>Visão geral<span class="hint">todas</span></button>' : '') +
+    S.espacos.map(e => { const n = atrPorEsp(e.id); return '<button class="area' + (S.esp === e.id ? ' on' : '') + '" data-a="area" data-v="' + e.id + '"><i class="dot a-' + e.slug + '"></i>' + esc(e.nome) + (n ? '<span class="badge" title="' + n + ' atrasada(s)">' + n + '</span>' : '') + '</button>'; }).join('');
+  $('#tbArea').innerHTML = '<button class="chip on" data-a="abrirSide">' + esc(S.esp === 'todos' ? 'Visão geral' : espNome(S.esp)) + ' ▾</button>';
+  $('#nav').innerHTML = '<div class="sec">' + esc(S.esp === 'todos' ? 'Visão geral' : 'Menu · ' + espNome(S.esp)) + '</div>' + NAV.map((n, i) =>
     (i === 4 ? '<div class="sec">Planejamento</div>' : i === 5 ? '<div class="sec">Gestão</div>' : '') +
     '<a href="#/' + n[0] + '" class="' + (r.pg === n[0] ? 'on' : '') + '">' + ic(n[2]) + esc(n[1]) + (n[0] === 'apagar' && atrasadas ? '<span class="badge">' + atrasadas + '</span>' : '') + '</a>').join('');
   $('#meNome').textContent = S.perfil.nome;
@@ -356,7 +396,7 @@ function render() {
 }
 
 function pageHead(titulo, sub, acoes) {
-  return '<div class="print-head"><h1>' + esc(titulo) + '</h1><p>Casa • Gestão Financeira Familiar — emitido em ' + ddmmaa(S.hoje) + ' por ' + esc(S.perfil.nome) + (sub ? ' — ' + esc(sub) : '') + '</p></div>' +
+  return '<div class="print-head"><h1>' + esc(titulo) + '</h1><p>BRV360 • ' + esc(S.esp === 'todos' ? 'Todas as áreas' : espNome(S.esp)) + ' — emitido em ' + ddmmaa(S.hoje) + ' por ' + esc(S.perfil.nome) + (sub ? ' — ' + esc(sub) : '') + '</p></div>' +
     '<div class="ph"><div><h1>' + esc(titulo) + '</h1>' + (sub ? '<p>' + sub + '</p>' : '') + '</div>' + (acoes ? '<div class="acts">' + acoes + '</div>' : '') + '</div>';
 }
 function mesNav(mes, act = 'mesNav') {
@@ -368,7 +408,8 @@ const ACTIONS = {
   fechar: () => fecharModal(),
   abrirSide: () => $('#side').classList.add('open'),
   sair: async () => { await S.sb.auth.signOut(); },
-  mesNav: el => { S.ui.mes = addMes(S.ui.mes, +el.dataset.v); render(); }
+  mesNav: el => { S.ui.mes = addMes(S.ui.mes, +el.dataset.v); render(); },
+  area: el => trocarEspaco(el.dataset.v)
 };
 document.addEventListener('click', e => {
   if (menuEl && !e.target.closest('.menu')) fecharMenu();

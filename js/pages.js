@@ -163,6 +163,7 @@ function resumoMudanca(a) {
 /* ===================== Dashboard ===================== */
 PAGES.painel = {
   html() {
+    if (S.esp === 'todos') return painelGeral();
     const f = S.ui.dash; const mes = S.ui.mes;
     const base = filtrarLanc(S.lanc, { responsavel: f.responsavel, centro: f.centro, categoria: f.categoria });
     const doMes = f.todos ? base : base.filter(l => mesKey(l.competencia) === mes);
@@ -179,7 +180,7 @@ PAGES.painel = {
       '<select class="inp sm" data-f="categoria">' + opts(C.lista('categoria', f.categoria), f.categoria, 'Todas as categorias') + '</select>' +
       (f.responsavel || f.centro || f.categoria || f.todos ? '<button class="btn sm ghost" data-a="dashLimpar">Limpar</button>' : '') + '</div>';
     const semDados = !vivos.length;
-    return pageHead('Dashboard', f.todos ? 'Todas as competências' : mesTitulo(mes), podeEditar() ? '<button class="btn pri" data-a="novaConta">' + ic('mais') + 'Nova conta</button>' : '') + filtros +
+    return pageHead('Dashboard · ' + espNome(S.esp), f.todos ? 'Todas as competências' : mesTitulo(mes), podeEditar() ? '<button class="btn pri" data-a="novaConta">' + ic('mais') + 'Nova conta</button>' : '') + filtros +
       (semDados && !f.todos && podeEditar() && fixasFaltando(mes).length ? '<div class="infobox" style="display:flex;align-items:center;gap:10px"><span style="flex:1">Nenhuma conta lançada em ' + mesLabel(mes) + '. Há <b>' + fixasFaltando(mes).length + ' contas recorrentes</b> prontas para gerar.</span><button class="btn sm pri" data-a="gerarMes">Gerar contas do mês</button></div>' : '') +
       '<div class="kpis">' +
       kpi('', 'Total de despesas', brl(r.total), delta == null ? r.qtd + ' contas' : (delta >= 0 ? '▲ ' : '▼ ') + brl(Math.abs(delta)) + ' vs. mês anterior') +
@@ -224,7 +225,9 @@ function passaStatus(l, s) {
   return k === s;
 }
 function linhaTabela(l, cols) {
+  const selecionavel = podeEditar() && aPagar(l);
   const td = {
+    sel: '<td class="selc">' + (selecionavel ? '<input type="checkbox" data-a="selConta" data-id="' + l.id + '"' + (S.sel.has(l.id) ? ' checked' : '') + ' aria-label="Selecionar">' : '') + '</td>',
     desc: '<td class="desc"><b>' + esc(l.descricao) + (l.revisar ? '<span class="flag" title="Revisar: ' + esc(l.revisar) + '"></span>' : '') + '</b><small>' + tagRec(l) + esc(C.nome(l.categoria_id) || 'Sem categoria') + '</small></td>',
     comp: '<td class="hide-m">' + mesCurto(mesKey(l.competencia)) + '</td>',
     resp: '<td>' + esc(C.nome(l.responsavel_id) || '—') + '</td>',
@@ -238,17 +241,65 @@ function linhaTabela(l, cols) {
     status: '<td>' + pill(l) + '</td>',
     acoes: '<td class="acts">' + (podeEditar() && st(l).k !== 'paga' && st(l).k !== 'cancelada' ? '<button class="btn xs" data-a="pagar" data-id="' + l.id + '">Pagar</button> ' : '') + '<button class="btn xs icon ghost" data-a="menuConta" data-id="' + l.id + '" aria-label="Ações">' + ic('dots') + '</button></td>'
   };
-  return '<tr data-a="verConta" data-id="' + l.id + '">' + cols.map(c => td[c]).join('') + '</tr>';
+  return '<tr data-a="verConta" data-id="' + l.id + '" class="' + (S.sel.has(l.id) ? 'selrow' : '') + '">' + cols.map(c => td[c]).join('') + '</tr>';
 }
-function linhaMovel(l, extra) {
-  return '<div class="mrow" data-a="verConta" data-id="' + l.id + '"><b>' + esc(l.descricao) + (l.revisar ? '<span class="flag"></span>' : '') + '</b><span class="v num">' + brl(l.valor) + '</span>' +
+function linhaMovel(l, extra, comSel) {
+  const ck = comSel && podeEditar() && aPagar(l) ? '<input type="checkbox" class="mck" data-a="selConta" data-id="' + l.id + '"' + (S.sel.has(l.id) ? ' checked' : '') + ' aria-label="Selecionar">' : '';
+  return '<div class="mrow' + (ck ? ' hasck' : '') + (S.sel.has(l.id) ? ' selrow' : '') + '" data-a="verConta" data-id="' + l.id + '">' + ck + '<b>' + esc(l.descricao) + (l.revisar ? '<span class="flag"></span>' : '') + '</b><span class="v num">' + brl(l.valor) + '</span>' +
     '<span class="s">' + pill(l) + tagRec(l) + diasTxt(l) + (extra ? '<span>' + extra + '</span>' : '') + '</span><span class="a">' + (podeEditar() && st(l).k !== 'paga' && st(l).k !== 'cancelada' ? '<button class="btn xs" data-a="pagar" data-id="' + l.id + '">Pagar</button>' : '') + '</span></div>';
 }
-const HEAD = { desc: 'Despesa', comp: 'Comp.', resp: 'Responsável', cc: 'Centro de custo', cat: 'Categoria', venc: 'Vencimento', pag: 'Pagamento', dias: 'Prazo', valor: 'Valor', pago: 'Valor pago', status: 'Status', acoes: '' };
+const HEAD = { sel: '<input type="checkbox" data-a="selTodos" aria-label="Selecionar todas">', desc: 'Despesa', comp: 'Comp.', resp: 'Responsável', cc: 'Centro de custo', cat: 'Categoria', venc: 'Vencimento', pag: 'Pagamento', dias: 'Prazo', valor: 'Valor', pago: 'Valor pago', status: 'Status', acoes: '' };
 function tabela(ls, cols, rodape) {
-  return '<div class="tbl-wrap resp"><table class="tbl"><thead><tr>' + cols.map(c => '<th class="' + (c === 'valor' || c === 'pago' ? 'r' : '') + (c === 'comp' ? ' hide-m' : '') + '">' + HEAD[c] + '</th>').join('') + '</tr></thead><tbody>' + ls.map(l => linhaTabela(l, cols)).join('') + '</tbody>' + (rodape || '') + '</table></div>' +
-    '<div class="mlist">' + ls.map(l => linhaMovel(l, esc(C.nome(l.categoria_id)))).join('') + '</div>';
+  if (cols[0] === 'sel' && !podeEditar()) cols = cols.slice(1);
+  const comSel = cols[0] === 'sel';
+  const grupo = comSel ? ls.filter(aPagar).map(l => l.id).join(',') : '';
+  return '<div class="tbl-wrap resp"><table class="tbl"><thead><tr>' + cols.map(c => '<th class="' + (c === 'valor' || c === 'pago' ? 'r' : '') + (c === 'comp' ? ' hide-m' : '') + (c === 'sel' ? ' selc' : '') + '">' + (c === 'sel' ? (grupo ? HEAD.sel.replace('data-a="selTodos"', 'data-a="selTodos" data-ids="' + grupo + '"' + (grupo.split(',').every(id => S.sel.has(id)) ? ' checked' : '')) : '') : HEAD[c]) + '</th>').join('') + '</tr></thead><tbody>' + ls.map(l => linhaTabela(l, cols)).join('') + '</tbody>' + (rodape || '') + '</table></div>' +
+    '<div class="mlist">' + ls.map(l => linhaMovel(l, esc(C.nome(l.categoria_id)), comSel)).join('') + '</div>';
 }
+function atualizarSelecao() {
+  const ids = [...S.sel].filter(id => S.lanc.some(l => l.id === id && aPagar(l)));
+  S.sel = new Set(ids);
+  const bar = $('#selbar'); if (!bar) return;
+  if (!ids.length) { bar.hidden = true; return; }
+  const tot = soma(S.lanc.filter(l => S.sel.has(l.id)), l => +l.valor);
+  bar.hidden = false;
+  bar.innerHTML = '<span><b>' + ids.length + '</b> selecionada' + (ids.length > 1 ? 's' : '') + ' · <b class="num">' + brl(tot) + '</b></span><button class="btn sm good" data-a="pagarSel">Marcar como pagas</button><button class="btn sm ghost" data-a="limparSel">Limpar</button>';
+  $$('[data-a=selConta]').forEach(c => { c.checked = S.sel.has(c.dataset.id); const row = c.closest('tr,.mrow'); if (row) row.classList.toggle('selrow', c.checked); });
+  $$('[data-a=selTodos]').forEach(c => { const g = (c.dataset.ids || '').split(',').filter(Boolean); c.checked = g.length && g.every(id => S.sel.has(id)); });
+}
+function modalPagarVarias() {
+  const ls = S.lanc.filter(l => S.sel.has(l.id)); if (!ls.length) return;
+  const tot = soma(ls, l => +l.valor);
+  abrirModal('Marcar ' + ls.length + ' conta(s) como pagas', '<p class="muted" style="margin:0 0 12px">Total de <b style="color:var(--ink)">' + brl(tot) + '</b>. O valor pago de cada conta será o valor original (dá para ajustar depois, uma a uma).</p>' +
+    '<div class="tbl-wrap" style="max-height:200px;margin-bottom:14px"><table class="tbl static"><tbody>' + ls.map(l => '<tr><td>' + esc(l.descricao) + ' <small class="muted">' + mesCurto(mesKey(l.competencia)) + '</small></td><td class="num">' + (ddmmaa(l.vencimento) || '—') + '</td><td class="r num">' + brl(l.valor) + '</td></tr>').join('') + '</tbody></table></div>' +
+    '<form id="fPV"><div class="field"><label>Data do pagamento</label>' + seg('pvModo', [['hoje', 'Hoje (' + dd(S.hoje) + ')'], ['venc', 'No vencimento de cada'], ['outra', 'Outra data']], 'hoje') + '</div>' +
+    '<div class="field" id="pvOutraW" hidden><label>Data</label><input class="inp" type="date" id="pvData" value="' + S.hoje + '"></div><div class="err" id="pvErr"></div>' +
+    '<div class="mf"><button type="button" class="btn" data-a="fechar">Cancelar</button><button class="btn good" id="pvS">Confirmar pagamento</button></div></form>', {
+    onMount: m => {
+      ligarSegs(m);
+      $('#pvModo', m).addEventListener('click', () => setTimeout(() => { $('#pvOutraW').hidden = segVal('pvModo') !== 'outra'; }, 0));
+      $('#fPV', m).onsubmit = async e => {
+        e.preventDefault(); const modo = segVal('pvModo'), outra = $('#pvData').value;
+        if (modo === 'outra' && !outra) return $('#pvErr').textContent = 'Informe a data.';
+        try {
+          await act(async () => {
+            for (let i = 0; i < ls.length; i += 10) {
+              await Promise.all(ls.slice(i, i + 10).map(l => DB.update('lancamentos', l.id, { pagamento: modo === 'hoje' ? S.hoje : modo === 'outra' ? outra : (l.vencimento || S.hoje), valor_pago: +l.valor })));
+            }
+            return ls.length;
+          }, n => n + ' conta(s) marcada(s) como paga(s).', $('#pvS'));
+          S.sel.clear(); fecharModal(); render();
+        } catch (err) { $('#pvErr').textContent = err.message; }
+      };
+    }
+  });
+}
+Object.assign(ACTIONS, {
+  selConta: (el, e) => { if (el.checked) S.sel.add(el.dataset.id); else S.sel.delete(el.dataset.id); atualizarSelecao(); },
+  selTodos: el => { (el.dataset.ids || '').split(',').filter(Boolean).forEach(id => el.checked ? S.sel.add(id) : S.sel.delete(id)); atualizarSelecao(); },
+  limparSel: () => { S.sel.clear(); atualizarSelecao(); },
+  pagarSel: () => modalPagarVarias()
+});
 Object.assign(ACTIONS, {
   verConta: el => { const l = S.lanc.find(x => x.id === el.dataset.id); if (l) detalhesConta(l); },
   pagar: el => { const l = S.lanc.find(x => x.id === el.dataset.id); if (l) modalPagar(l); },
@@ -264,7 +315,7 @@ PAGES.contas = {
     ls.sort((a, b) => (a.vencimento || '9999') < (b.vencimento || '9999') ? -1 : (a.vencimento || '9999') > (b.vencimento || '9999') ? 1 : a.descricao.localeCompare(b.descricao));
     const vivos = ls.filter(l => !l.cancelado); const r = resumo(ls);
     const falt = fixasFaltando(mes);
-    return pageHead('Contas e despesas', 'Cadastro e gestão de todos os lançamentos', podeEditar() ? '<button class="btn" data-a="gerarMesModal">Gerar recorrentes</button><button class="btn pri" data-a="novaConta">' + ic('mais') + 'Nova conta</button>' : '') +
+    return pageHead('Contas e despesas · ' + espNome(S.esp), 'Cadastro e gestão de todos os lançamentos desta área', podeEditar() ? '<button class="btn" data-a="gerarMesModal">Gerar recorrentes</button><button class="btn pri" data-a="novaConta">' + ic('mais') + 'Nova conta</button>' : '') +
       '<div class="filters">' + (f.todos ? '' : mesNav(mes)) +
       '<select class="inp sm" data-f="todos"><option value="">Só o mês</option><option value="1"' + (f.todos ? ' selected' : '') + '>Todas as competências</option></select>' +
       '<input class="inp sm search" data-f="q" placeholder="Buscar despesa, observação…" value="' + esc(f.q || '') + '">' +
@@ -276,10 +327,10 @@ PAGES.contas = {
       (falt.length && !f.todos && podeEditar() ? '<div class="infobox" style="display:flex;align-items:center;gap:10px"><span style="flex:1"><b>' + falt.length + ' conta(s) recorrente(s)</b> ainda não lançada(s) em ' + mesLabel(mes) + '.</span><button class="btn sm pri" data-a="gerarMes">Gerar agora</button></div>' : '') +
       '<div class="kpis"><div class="kpi"><div class="l">Contas</div><div class="v num">' + vivos.length + '</div><div class="s">' + (ls.length - vivos.length ? (ls.length - vivos.length) + ' cancelada(s) fora dos totais' : 'no filtro atual') + '</div></div>' +
       '<div class="kpi"><div class="l">Total</div><div class="v num">' + brl(r.total) + '</div></div><div class="kpi good"><div class="l">Pago</div><div class="v num">' + brl(r.pago) + '</div></div><div class="kpi ' + (r.atrasado ? 'crit' : '') + '"><div class="l">Em aberto</div><div class="v num">' + brl(r.aberto) + '</div><div class="s">' + (r.atrasado ? brl(r.atrasado) + ' atrasado' : 'nada atrasado') + '</div></div></div>' +
-      (ls.length ? tabela(ls, ['desc', 'comp', 'resp', 'cc', 'venc', 'pag', 'valor', 'status', 'acoes'], '<tfoot><tr><td colspan="6">' + vivos.length + ' conta(s)</td><td class="r num">' + brl(r.total) + '</td><td colspan="2"></td></tr></tfoot>')
+      (ls.length ? tabela(ls, ['sel', 'desc', 'comp', 'resp', 'cc', 'venc', 'pag', 'valor', 'status', 'acoes'], '<tfoot><tr><td colspan="' + (podeEditar() ? 7 : 6) + '">' + vivos.length + ' conta(s)</td><td class="r num">' + brl(r.total) + '</td><td colspan="2"></td></tr></tfoot>')
         : '<div class="tbl-wrap"><div class="empty"><b>Nenhuma conta encontrada</b>Ajuste os filtros' + (podeEditar() ? ' ou cadastre uma nova conta.<br><button class="btn pri" data-a="novaConta">Nova conta</button>' : '.') + '</div></div>');
   },
-  mount() { ligarFiltros(S.ui.contas); }
+  mount() { ligarFiltros(S.ui.contas); atualizarSelecao(); }
 };
 function ligarFiltros(obj) {
   $$('[data-f]').forEach(el => {
@@ -314,7 +365,7 @@ PAGES.apagar = {
     const tot = soma(ls, l => +l.valor), atr = soma(ls.filter(l => st(l).k === 'atrasada'), l => +l.valor), prox = soma(ls.filter(l => ['hoje', 'semana'].includes(st(l).k)), l => +l.valor);
     const meses = mesesComDados();
     const grupos = FAIXAS.map(([g, t, c]) => [g, t, c, ls.filter(l => st(l).grupo === g).sort((a, b) => (a.vencimento || a.agendado_para || '9') < (b.vencimento || b.agendado_para || '9') ? -1 : 1)]).filter(x => x[3].length);
-    return pageHead('Contas a pagar', 'Tudo o que ainda precisa ser pago, separado por prazo. As contas recorrentes do mês entram aqui automaticamente.') +
+    return pageHead('Contas a pagar · ' + espNome(S.esp), 'Tudo o que ainda precisa ser pago, separado por prazo. Marque as caixinhas para pagar várias de uma vez.') +
       '<div class="kpis k3"><div class="kpi"><div class="l">TOTAL A PAGAR</div><div class="v num">' + brl(tot) + '</div><div class="s">' + ls.length + ' conta(s) pendente(s)</div></div>' +
       '<div class="kpi crit"><div class="l"><i style="background:var(--crit)"></i>TOTAL ATRASADO</div><div class="v num">' + brl(atr) + '</div><div class="s">' + ls.filter(l => st(l).k === 'atrasada').length + ' conta(s) vencida(s)</div></div>' +
       '<div class="kpi warn"><div class="l"><i style="background:var(--warn)"></i>PRÓXIMOS VENCIMENTOS</div><div class="v num">' + brl(prox) + '</div><div class="s">hoje até ' + dd(addDias(S.hoje, 7)) + '</div></div></div>' +
@@ -324,10 +375,10 @@ PAGES.apagar = {
       '<select class="inp sm" data-f="status">' + optsTxt([['', 'Todos os status'], ['atrasada', 'Atrasadas'], ['pendente', 'Pendentes no prazo'], ['agendada', 'Agendadas']], f.status || '') + '</select>' +
       '<select class="inp sm" data-f="origem">' + optsTxt([['', 'Recorrentes e avulsas'], ['rec', 'Só recorrentes'], ['avulsa', 'Só avulsas']], f.origem || '') + '</select></div>' +
       (grupos.length ? grupos.map(([g, t, c, gl]) => '<div class="group"><div class="group-h"><h3>' + t + '</h3><span class="tag ' + c + '">' + gl.length + '</span><span class="sum num">' + brl(soma(gl, l => +l.valor)) + '</span></div>' +
-        tabela(gl, ['desc', 'comp', 'resp', 'venc', 'dias', 'valor', 'status', 'acoes']) + '</div>').join('')
+        tabela(gl, ['sel', 'desc', 'comp', 'resp', 'venc', 'dias', 'valor', 'status', 'acoes']) + '</div>').join('')
         : '<div class="tbl-wrap"><div class="empty"><b>Nada a pagar</b>Nenhuma conta pendente para os filtros escolhidos.</div></div>');
   },
-  mount() { ligarFiltros(S.ui.apagar); }
+  mount() { ligarFiltros(S.ui.apagar); atualizarSelecao(); }
 };
 
 /* ===================== Contas pagas ===================== */
@@ -348,7 +399,7 @@ PAGES.pagas = {
     ls.sort((a, b) => a.pagamento < b.pagamento ? 1 : -1);
     const orig = soma(ls, l => +l.valor), pago = soma(ls, valorEfetivo), atraso = ls.filter(l => st(l).atraso);
     const chip = (k, t) => '<button class="chip' + (f.periodo === k ? ' on' : '') + '" data-a="pagasPer" data-v="' + k + '">' + t + '</button>';
-    return pageHead('Contas pagas', 'Histórico de pagamentos realizados — ' + (de === '1900-01-01' ? 'todo o período' : ddmmaa(de) + ' a ' + ddmmaa(ate))) +
+    return pageHead('Contas pagas · ' + espNome(S.esp), 'Histórico de pagamentos realizados — ' + (de === '1900-01-01' ? 'todo o período' : ddmmaa(de) + ' a ' + ddmmaa(ate))) +
       '<div class="filters"><div class="chips">' + chip('mes', 'Este mês') + chip('3m', 'Últimos 3 meses') + chip('ano', 'Este ano') + chip('tudo', 'Tudo') + chip('custom', 'Período') + '</div>' +
       (f.periodo === 'custom' ? '<input class="inp sm" type="date" data-f="de" value="' + esc(f.de || '') + '" title="De"><input class="inp sm" type="date" data-f="ate" value="' + esc(f.ate || '') + '" title="Até">' : '') +
       '<input class="inp sm search" data-f="q" placeholder="Buscar…" value="' + esc(f.q || '') + '">' +
@@ -383,7 +434,7 @@ PAGES.metas = {
     const ms = S.metas.filter(m => m.ativo !== arquivadas).sort((a, b) => (a.data_limite || '9') < (b.data_limite || '9') ? -1 : 1);
     const ativos = S.metas.filter(m => m.ativo);
     const totG = soma(ativos, m => calcMeta(m).total), totM = soma(ativos, m => +m.valor_meta);
-    return pageHead('Economias e metas', ativos.length + ' meta(s) ativa(s) · ' + brl(totG) + ' guardados de ' + brl(totM), podeEditar() ? '<button class="btn pri" data-a="novaMeta">' + ic('mais') + 'Nova meta</button>' : '') +
+    return pageHead('Economias e metas · ' + espNome(S.esp), ativos.length + ' meta(s) ativa(s) · ' + brl(totG) + ' guardados de ' + brl(totM), podeEditar() ? '<button class="btn pri" data-a="novaMeta">' + ic('mais') + 'Nova meta</button>' : '') +
       '<div class="tabs"><a href="#/metas" class="' + (arquivadas ? '' : 'on') + '">Ativas</a><a href="#/metas/arquivadas" class="' + (arquivadas ? 'on' : '') + '">Arquivadas</a></div>' +
       (ms.length ? '<div class="metas">' + ms.map(m => {
         const c = calcMeta(m);
@@ -438,3 +489,41 @@ Object.assign(ACTIONS, {
       { t: 'Excluir', d: true, f: async () => { if (await confirmar('Excluir meta?', 'A meta <b>' + esc(m.nome) + '</b> vai para a lixeira (com seus aportes).', 'Excluir')) act(() => DB.update('metas', m.id, { excluido_em: new Date().toISOString() }), 'Meta enviada para a lixeira.'); } }]);
   }
 });
+
+/* ===================== Visão geral (todas as áreas) ===================== */
+function painelGeral() {
+  const mes = S.ui.mes, fim = mes;
+  const linhas = S.espacos.map(e => {
+    const ls = S.A.lanc.filter(l => l.espaco_id === e.id);
+    const doMes = ls.filter(l => mesKey(l.competencia) === mes);
+    const r = resumo(doMes);
+    const divida = ls.filter(l => aPagar(l) && mesKey(l.competencia) <= fim);
+    const atr = ls.filter(l => st(l).k === 'atrasada' && mesKey(l.competencia) <= fim);
+    const pagoAno = soma(ls.filter(l => ehPaga(l) && l.pagamento.slice(0, 4) === mes.slice(0, 4)), valorEfetivo);
+    return { e, r, divida, atr, pagoAno, semana: ls.filter(l => ['hoje', 'semana'].includes(st(l).k)) };
+  });
+  const T = k => soma(linhas, x => x.r[k]);
+  const dividaQ = soma(linhas, x => x.divida.length), dividaV = soma(linhas, x => soma(x.divida, l => +l.valor));
+  const atrQ = soma(linhas, x => x.atr.length), atrV = soma(linhas, x => soma(x.atr, l => +l.valor));
+  const semV = soma(linhas, x => soma(x.semana, l => +l.valor));
+  const pagoAno = soma(linhas, x => x.pagoAno);
+  const kpi = (cls, l, v, s) => '<div class="kpi ' + cls + '"><div class="l">' + l + '</div><div class="v num">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>';
+  const meses = []; for (let i = 11; i >= 0; i--) meses.push(addMes(mes, -i));
+  return pageHead('Visão geral', 'Casa e empresas juntas · ' + mesTitulo(mes)) +
+    '<div class="filters"><span class="lbl">Mês</span>' + mesNav(mes) + '<span class="muted" style="font-size:13px;margin-left:6px">Para lançar ou pagar, escolha uma área no menu.</span></div>' +
+    '<div class="kpis">' +
+    kpi(dividaV ? 'crit' : '', '<i style="background:var(--crit)"></i>Total de dívidas em aberto', brl(dividaV), dividaQ + ' conta(s) a pagar até ' + mesLabel(mes)) +
+    kpi(atrV ? 'crit' : '', 'Atrasadas (todas as áreas)', brl(atrV), atrQ + ' conta(s) vencida(s) até ' + mesCurto(mes)) +
+    kpi('good', '<i style="background:var(--good)"></i>Pago em ' + MESES[+mes.slice(5) - 1], brl(T('pago')), pct(T('pago'), T('total')) + '% das contas do mês') +
+    kpi('good', 'Pago em ' + mes.slice(0, 4), brl(pagoAno), 'valor efetivamente pago no ano') +
+    kpi('', 'Total de contas do mês', brl(T('total')), T('qtd') + ' conta(s) nas quatro áreas') +
+    kpi('', 'Em aberto no mês', brl(T('aberto')), T('qPend') + ' pendente(s)') +
+    kpi(semV ? 'warn' : '', '<i style="background:var(--warn)"></i>Próximos 7 dias', brl(semV), 'vencem até ' + dd(addDias(S.hoje, 7))) +
+    kpi('', '% pago no mês', pct(T('pago'), T('total')) + '%', '<div class="split" style="margin:6px 0 0;height:6px"><i style="width:' + pct(T('pago'), T('total')) + '%;background:var(--good)"></i></div>') + '</div>' +
+    '<div class="tbl-wrap" style="margin-bottom:16px"><table class="tbl static"><thead><tr><th>Área</th><th class="r">Contas do mês</th><th class="r">Pago</th><th class="r">Em aberto</th><th class="r">Atrasado</th><th class="r">Dívidas em aberto</th><th></th></tr></thead><tbody>' +
+    linhas.map(x => '<tr><td><b><i class="dot a-' + x.e.slug + '" style="margin-right:8px"></i>' + esc(x.e.nome) + '</b></td><td class="r num">' + brl(x.r.total) + '</td><td class="r num" style="color:var(--good)">' + brl(x.r.pago) + '</td><td class="r num">' + brl(x.r.aberto) + '</td><td class="r num" style="color:' + (x.atr.length ? 'var(--crit)' : 'inherit') + '">' + brl(soma(x.atr, l => +l.valor)) + (x.atr.length ? ' <small>(' + x.atr.length + ')</small>' : '') + '</td><td class="r num"><b>' + brl(soma(x.divida, l => +l.valor)) + '</b> <small class="muted">' + x.divida.length + ' conta(s)</small></td><td class="acts"><button class="btn xs" data-a="area" data-v="' + x.e.id + '">Abrir</button></td></tr>').join('') +
+    '</tbody><tfoot><tr><td>Total</td><td class="r num">' + brl(T('total')) + '</td><td class="r num">' + brl(T('pago')) + '</td><td class="r num">' + brl(T('aberto')) + '</td><td class="r num">' + brl(atrV) + '</td><td class="r num">' + brl(dividaV) + ' <small>' + dividaQ + '</small></td><td></td></tr></tfoot></table></div>' +
+    '<div class="cards"><div class="card c6"><h3>Situação do mês por área<span class="r">' + mesCurto(mes) + '</span></h3>' + colunas(linhas.map(x => ({ rot: x.e.nome, tip: x.e.nome + ' · ' + mesTitulo(mes), vals: [x.r.pago, x.r.aberto - x.r.atrasado, x.r.atrasado] })), [{ k: 'paid', nome: 'Pago' }, { k: 'open', nome: 'Em aberto' }, { k: 'late', nome: 'Atrasado' }]) + '</div>' +
+    '<div class="card c6"><h3>Dívidas em aberto por área<span class="r">até ' + mesCurto(mes) + '</span></h3>' + hbars(linhas.map(x => [x.e.nome, soma(x.divida, l => +l.valor)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]), dividaV) + '</div>' +
+    '<div class="card c12"><h3>Total de contas por mês (todas as áreas)<span class="r">últimos 12 meses</span></h3>' + colunas(meses.map(k => ({ rot: MES3[+k.slice(5) - 1], tip: mesTitulo(k), on: k === mes, dim: k !== mes, vals: [resumo(S.A.lanc.filter(l => mesKey(l.competencia) === k)).total] })), [{ k: 'a', nome: 'Total' }]) + '</div></div>';
+}

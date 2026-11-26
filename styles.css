@@ -60,6 +60,16 @@ textarea.inp{height:72px;padding:9px 12px;resize:vertical}
 .side .brand .logo{width:36px;height:36px;border-radius:10px;margin:0;background:rgba(255,255,255,.12)}
 .side .brand .logo svg{width:19px;height:19px}
 .side .brand small{display:block;color:#93A3C3;font-weight:500;font-size:11.5px}
+.areas{padding:0 12px 6px;border-bottom:1px solid rgba(255,255,255,.08)}
+.areas .sec{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7F90B3;padding:4px 10px 6px}
+.area{display:flex;align-items:center;gap:10px;width:100%;height:36px;padding:0 10px;border:0;border-radius:9px;background:none;color:#C9D3E6;font-weight:500;text-align:left;margin-bottom:2px}
+.area:hover{background:rgba(255,255,255,.06);color:#fff}
+.area.on{background:#fff;color:var(--navy);font-weight:700}
+.area .hint{margin-left:auto;font-size:11px;opacity:.6}
+.area .badge{margin-left:auto;background:var(--crit);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none;vertical-align:middle}
+.a-casa{background:#4C7BD9}.a-bravus{background:#9AA6B8;box-shadow:inset 0 0 0 2px #2B3445}.a-bravinhos{background:#E39B3B}.a-hub{background:#8B6CF0}
+.dot-all{background:conic-gradient(#4C7BD9 0 25%,#9AA6B8 0 50%,#E39B3B 0 75%,#8B6CF0 0)}
 .nav{flex:1;overflow:auto;padding:6px 12px}
 .nav .sec{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7F90B3;padding:14px 10px 6px}
 .nav a{display:flex;align-items:center;gap:11px;height:38px;padding:0 10px;border-radius:9px;color:#C9D3E6;text-decoration:none;font-weight:500;margin-bottom:2px}
@@ -166,6 +176,12 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .tbl .acts{white-space:nowrap;text-align:right;width:1%}
 .tbl.static tbody tr{cursor:default}
 .tagrec{display:inline-block;font-size:11px;font-weight:600;color:var(--info);background:var(--info-soft);border-radius:6px;padding:1px 6px;margin-right:6px;white-space:nowrap}
+.selc{width:34px;text-align:center}
+.selc input,.mck{width:17px;height:17px;accent-color:var(--navy);cursor:pointer}
+tr.selrow td{background:#EEF3FC!important}
+.selbar{position:fixed;left:calc(50% + var(--side)/2);bottom:20px;transform:translateX(-50%);z-index:35;background:var(--ink);color:#fff;border-radius:14px;padding:8px 8px 8px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 12px 32px rgba(15,27,45,.3);font-size:14px;max-width:calc(100vw - 24px)}
+.selbar .btn.ghost{color:#fff}.selbar .btn.ghost:hover{background:rgba(255,255,255,.1)}
+label.chip{cursor:pointer}
 .flag{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-left:6px;vertical-align:middle}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
 .pill i{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
@@ -291,6 +307,11 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
   .mlist{display:block;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
   .mrow{display:grid;grid-template-columns:1fr auto;gap:3px 10px;padding:12px 14px;border-bottom:1px solid var(--line-2);cursor:pointer}
   .mrow:last-child{border-bottom:0}
+  .mrow.hasck{grid-template-columns:auto 1fr auto}.mrow.hasck .mck{grid-row:span 3;align-self:center;margin-right:2px}
+  .mrow.hasck .s,.mrow.hasck .a{grid-column:2/-1}.mrow.hasck .a{grid-column:3}.mrow.hasck .s{grid-column:2}
+  .mrow.selrow{background:#EEF3FC}
+  .selbar{left:50%;bottom:calc(72px + var(--safe-b))}
+  .topbar #tbArea .chip{height:30px;font-size:12px}
   .mrow b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mrow .v{font-weight:700;text-align:right}
   .mrow .s{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
